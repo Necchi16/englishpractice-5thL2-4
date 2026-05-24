@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>えいごではなそう！</title>
+  
+  <!-- Tailwind CSSの読み込み -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- ReactとReactDOMの読み込み -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  
+  <!-- ブラウザ上でReact(JSX)を動かすためのBabel -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    /* アニメーション用のCSS */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in-up {
+      animation: fadeInUp 0.6s ease-out forwards;
+    }
+  </style>
+</head>
+<body class="bg-blue-50 font-sans">
+  <!-- ここにアプリが表示されます -->
+  <div id="root"></div>
+
+  <!-- アプリのプログラム -->
+  <script type="text/babel">
+    const { useState, useEffect, useCallback } = React;
+
+    // --- モンスターデータ (全30種類) ---
+    const MONSTERS = [
+      { id: 1, name: "勇気のライオン", emoji: "🦁", color: "bg-orange-200" },
+      { id: 2, name: "笑顔のドラゴン", emoji: "🐉", color: "bg-green-200" },
+      { id: 3, name: "星の妖精", emoji: "🧚", color: "bg-yellow-200" },
+      { id: 4, name: "幸運のユニコーン", emoji: "🦄", color: "bg-pink-200" },
+      { id: 5, name: "知恵のフクロウ", emoji: "🦉", color: "bg-blue-200" },
+      { id: 6, name: "元気なウサギ", emoji: "🐰", color: "bg-red-200" },
+      { id: 7, name: "仲良しキツネ", emoji: "🦊", color: "bg-orange-300" },
+      { id: 8, name: "のんびりパンダ", emoji: "🐼", color: "bg-gray-200" },
+      { id: 9, name: "優しいコアラ", emoji: "🐨", color: "bg-gray-300" },
+      { id: 10, name: "希望のトラ", emoji: "🐯", color: "bg-yellow-300" },
+      { id: 11, name: "歌うカエル", emoji: "🐸", color: "bg-green-300" },
+      { id: 12, name: "踊るペンギン", emoji: "🐧", color: "bg-blue-300" },
+      { id: 13, name: "夢見るイルカ", emoji: "🐬", color: "bg-cyan-200" },
+      { id: 14, name: "長寿のカメ", emoji: "🐢", color: "bg-green-400" },
+      { id: 15, name: "幸せのテントウムシ", emoji: "🐞", color: "bg-red-300" },
+      { id: 16, name: "輝くチョウ", emoji: "🦋", color: "bg-blue-400" },
+      { id: 17, name: "ピヨピヨひよこ", emoji: "🐥", color: "bg-yellow-400" },
+      { id: 18, name: "力強いT-レックス", emoji: "🦖", color: "bg-green-500" },
+      { id: 19, name: "穏やかなブラキオサウルス", emoji: "🦕", color: "bg-blue-500" },
+      { id: 20, name: "華麗なクジャク", emoji: "🦚", color: "bg-emerald-300" },
+      { id: 21, name: "おしゃべりオウム", emoji: "🦜", color: "bg-red-400" },
+      { id: 22, name: "優雅なハクチョウ", emoji: "🦢", color: "bg-gray-100" },
+      { id: 23, name: "情熱のフラミンゴ", emoji: "🦩", color: "bg-pink-300" },
+      { id: 24, name: "まじめなハリネズミ", emoji: "🦔", color: "bg-amber-200" },
+      { id: 25, name: "遊び好きなラッコ", emoji: "🦦", color: "bg-orange-100" },
+      { id: 26, name: "準備万端リス", emoji: "🐿️", color: "bg-amber-300" },
+      { id: 27, name: "光る流れ星", emoji: "🌟", color: "bg-yellow-100" },
+      { id: 28, name: "きらきら魔法", emoji: "✨", color: "bg-yellow-50" },
+      { id: 29, name: "ぽかぽか太陽", emoji: "☀️", color: "bg-orange-50" },
+      { id: 30, name: "ふんわり雲", emoji: "☁️", color: "bg-blue-50" }
+    ];
+
+    // --- 英語辞書データ ---
+    const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const DATES = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth",
+      "eleventh", "twelfth", "thirteenth", "fourteenth", "fifteenth", "sixteenth", "seventeenth", "eighteenth", "nineteenth", "twentieth",
+      "twenty-first", "twenty-second", "twenty-third", "twenty-fourth", "twenty-fifth", "twenty-sixth", "twenty-seventh", "twenty-eighth", "twenty-ninth", "thirtieth", "thirty-first"];
+
+    const getOrdinal = (n) => {
+      const s = ["th", "st", "nd", "rd"];
+      const v = n % 100;
+      return n + (s[(v - 20) % 10] || s[v] || s[0]);
+    };
+
+    // --- アプリケーション本体 ---
+    function App() {
+      const [step, setStep] = useState('HOME'); 
+      const [playCount, setPlayCount] = useState(0);
+      const [collections, setCollections] = useState([]);
+      
+      const [selectedMonth, setSelectedMonth] = useState(1);
+      const [selectedDate, setSelectedDate] = useState(1);
+      const [reason, setReason] = useState("");
+      
+      const [failCount, setFailCount] = useState(0);
+      const [isListening, setIsListening] = useState(false);
+      const [recognitionText, setRecognitionText] = useState("");
+      const [feedbackMsg, setFeedbackMsg] = useState("");
+      const [currentGachaMonster, setCurrentGachaMonster] = useState(null);
+      const [isRolling, setIsRolling] = useState(false);
+      const [rollEmoji, setRollEmoji] = useState("🎁");
+
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const synth = window.speechSynthesis;
+
+      // 初期化：ローカルストレージからデータ読み込み
+      useEffect(() => {
+        const savedCount = localStorage.getItem('englishAppPlayCount');
+        if (savedCount) setPlayCount(parseInt(savedCount, 10));
+
+        const savedCollections = localStorage.getItem('englishAppCollections');
+        if (savedCollections) setCollections(JSON.parse(savedCollections));
+      }, []);
+
+      // データ保存
+      const saveData = (newCount, newCollections) => {
+        localStorage.setItem('englishAppPlayCount', newCount.toString());
+        localStorage.setItem('englishAppCollections', JSON.stringify(newCollections));
+        setPlayCount(newCount);
+        setCollections(newCollections);
+      };
+
+      // --- 音声合成 (TTS) ---
+      const speak = useCallback((text, rate = 0.9) => {
+        if (synth.speaking) {
+          synth.cancel();
+        }
+        const utterThis = new SpeechSynthesisUtterance(text);
+        utterThis.lang = 'en-US';
+        utterThis.rate = rate; 
+        
+        const voices = synth.getVoices();
+        const englishVoice = voices.find(voice => voice.lang.includes('en-US') && voice.name.includes('Female')) || voices.find(voice => voice.lang.includes('en-US'));
+        if (englishVoice) {
+          utterThis.voice = englishVoice;
+        }
+        
+        synth.speak(utterThis);
+      }, [synth]);
+
+      // コンピューターの回答時の音声再生
+      useEffect(() => {
+        if (step === 'COM_ANSWER_DAY') {
+          const comAnswer = "My special day is December twenty-fifth.";
+          setTimeout(() => speak(comAnswer), 500);
+        } else if (step === 'COM_ANSWER_WHY') {
+          const comAnswerWhy = "Because it's Christmas! I love eating cake with my family.";
+          setTimeout(() => speak(comAnswerWhy), 500);
+        }
+      }, [step, speak]);
+
+      // --- 音声認識 (STT) と判定 ---
+      const startListening = (targetType) => {
+        if (!SpeechRecognition) {
+          alert("お使いのブラウザは音声入力に対応していません。スキップボタンで進んでください。");
+          setFailCount(5); 
+          return;
+        }
+
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'en-US';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        setIsListening(true);
+        setRecognitionText("きいています...");
+        setFeedbackMsg("");
+
+        recognition.onresult = (event) => {
+          const transcript = event.results[0][0].transcript.toLowerCase();
+          setRecognitionText(transcript);
+          checkPronunciation(transcript, targetType);
+        };
+
+        recognition.onerror = (event) => {
+          console.error("Speech recognition error", event.error);
+          setIsListening(false);
+          setRecognitionText("うまくききとれませんでした。もういちどボタンをおしてね。");
+          setFailCount(prev => prev + 1);
+        };
+
+        recognition.onend = () => {
+          setIsListening(false);
+        };
+
+        recognition.start();
+      };
+
+      const checkPronunciation = (transcript, targetType) => {
+        let isCorrect = false;
+        
+        if (targetType === 'MY_DAY') {
+          const monthEng = MONTHS[selectedMonth - 1].toLowerCase();
+          const dateNum = selectedDate.toString();
+          const dateOrdinalNum = getOrdinal(selectedDate).toLowerCase();
+          const dateWord = DATES[selectedDate - 1].toLowerCase();
+          
+          const hasMonth = transcript.includes(monthEng);
+          const hasDate = transcript.includes(dateWord) || transcript.includes(dateNum) || transcript.includes(dateOrdinalNum);
+          
+          isCorrect = hasMonth && hasDate;
+        } 
+        else if (targetType === 'ASK_DAY') {
+          isCorrect = transcript.includes("when") && transcript.includes("special") && transcript.includes("day");
+        }
+        else if (targetType === 'ASK_WHY') {
+          isCorrect = transcript.includes("why");
+        }
+
+        if (isCorrect) {
+          setFeedbackMsg("Excellent! 👏");
+          setTimeout(() => speak("Excellent!"), 500);
+          setTimeout(() => {
+            proceedToNext(targetType);
+          }, 2000);
+        } else {
+          setFeedbackMsg("おしい！もういちどチャレンジ！");
+          setFailCount(prev => prev + 1);
+        }
+      };
+
+      const proceedToNext = (fromType) => {
+        setFailCount(0);
+        setRecognitionText("");
+        setFeedbackMsg("");
+        
+        if (fromType === 'MY_DAY') setStep('ASK_WHY');
+        if (fromType === 'ASK_DAY') setStep('COM_ANSWER_DAY');
+        if (fromType === 'ASK_WHY') setStep('COM_ANSWER_WHY');
+      };
+
+      // --- ガチャロジック ---
+      const rollGacha = () => {
+        setIsRolling(true);
+        
+        const intervalId = setInterval(() => {
+          const randomMonster = MONSTERS[Math.floor(Math.random() * MONSTERS.length)];
+          setRollEmoji(randomMonster.emoji);
+        }, 100);
+
+        const ownedIds = collections.map(c => c.id);
+        const unownedMonsters = MONSTERS.filter(m => !ownedIds.includes(m.id));
+
+        let newMonster;
+        if (unownedMonsters.length > 0) {
+          const randomIndex = Math.floor(Math.random() * unownedMonsters.length);
+          newMonster = unownedMonsters[randomIndex];
+        } else {
+          const randomIndex = Math.floor(Math.random() * MONSTERS.length);
+          newMonster = MONSTERS[randomIndex];
+        }
+
+        setTimeout(() => {
+          clearInterval(intervalId);
+          setIsRolling(false);
+          setCurrentGachaMonster(newMonster);
+          
+          if (!ownedIds.includes(newMonster.id)) {
+            saveData(playCount + 1, [...collections, newMonster]);
+          } else {
+            saveData(playCount + 1, collections);
+          }
+        }, 2500);
+      };
+
+      const renderHeader = (title) => (
+        <div className="bg-blue-500 text-white p-4 rounded-t-2xl flex items-center justify-center font-bold text-xl mb-4 shadow-md">
+          {title}
+        </div>
+      );
+
+      // === 各画面のレンダリング ===
+
+      if (step === 'HOME') {
+        return (
+          <div className="min-h-screen p-4 md:p-8 flex flex-col justify-center">
+            <div className="max-w-2xl w-full mx-auto bg-white rounded-3xl shadow-xl overflow-hidden border-4 border-blue-200">
+              <div className="bg-gradient-to-r from-blue-400 to-indigo-500 p-8 text-center text-white">
+                <h1 className="text-3xl md:text-4xl font-extrabold mb-4 drop-shadow-md">えいごで はなそう！</h1>
+                <p className="text-lg bg-white/20 inline-block px-4 py-2 rounded-full font-medium">
+                  🎧 イヤホンを つけましょう 🎧
+                </p>
+              </div>
+              
+              <div className="p-8 text-center">
+                <button 
+                  onClick={() => {
+                    setStep('GREETING');
+                    setTimeout(() => speak("Hello! When is your special day?"), 500);
+                  }}
+                  className="bg-red-500 hover:bg-red-600 text-white text-2xl font-bold py-4 px-12 rounded-full shadow-lg transform transition hover:scale-105 active:scale-95 flex items-center justify-center mx-auto mb-8"
+                >
+                  <span className="mr-2 text-2xl">▶️</span> スタート！
+                </button>
+
+                <div className="bg-yellow-50 rounded-2xl p-6 border-2 border-yellow-200">
+                  <h2 className="text-xl font-bold text-yellow-700 mb-4 flex items-center justify-center">
+                    <span className="mr-2">⭐</span> あつめたモンスター ({collections.length}/30)
+                  </h2>
+                  <div className="grid grid-cols-5 gap-2 md:gap-4">
+                    {collections.map(m => (
+                      <div key={m.id} className={`${m.color} p-2 rounded-xl text-center shadow-sm text-2xl relative group cursor-default`} title={m.name}>
+                        {m.emoji}
+                        <div className="absolute hidden group-hover:block bg-black text-white text-xs p-1 rounded -top-8 left-1/2 transform -translate-x-1/2 whitespace-nowrap z-10">
+                          {m.name}
+                        </div>
+                      </div>
+                    ))}
+                    {Array.from({ length: 30 - collections.length }).map((_, i) => (
+                      <div key={`empty-${i}`} className="bg-gray-100 p-2 rounded-xl text-center border-2 border-dashed border-gray-300 text-2xl opacity-50">
+                        ❓
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      if (step === 'GREETING') {
+        return (
+          <div className="min-h-screen bg-green-50 p-4 md:p-8 flex items-center justify-center">
+            <div className="max-w-lg w-full bg-white rounded-3xl shadow-xl p-8 border-4 border-green-200 text-center">
+              {renderHeader("コンピューターからの しつもん")}
+              
+              <div className="mb-8">
+                <button onClick={() => speak("Hello! When is your special day?")} className="bg-blue-100 p-4 rounded-full text-blue-600 hover:bg-blue-200 transition mx-auto flex items-center justify-center mb-4">
+                  <span className="text-4xl">🔊</span>
+                </button>
+                <p className="text-2xl font-bold text-gray-700">"When is your special day?"</p>
+                <p className="text-gray-500 mt-2">（あなたの とくべつな日は いつですか？）</p>
+              </div>
+
+              <div className="bg-gray-50 p-6 rounded-2xl mb-8">
+                <p className="text-lg font-bold mb-4 text-left">わたしの特別な日は…</p>
+                <div className="flex items-center justify-center gap-4 text-xl">
+                  <select 
+                    value={selectedMonth} 
+                    onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                    className="p-3 border-2 border-gray-300 rounded-xl bg-white font-bold"
+                  >
+                    {Array.from({length: 12}, (_, i) => i + 1).map(m => (
+                      <option key={m} value={m}>{m}月</option>
+                    ))}
+                  </select>
+                  <span>月</span>
+                  <select 
+                    value={selectedDate} 
+                    onChange={(e) => setSelectedDate(parseInt(e.target.value))}
+                    className="p-3 border-2 border-gray-300 rounded-xl bg-white font-bold"
+                  >
+                    {Array.from({length: 31}, (_, i) => i + 1).map(d => (
+                      <option key={d} value={d}>{d}日</option>
+                    ))}
+                  </select>
+                  <span>日です。</span>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => {
+                  setStep('SPEAK_MY_DAY');
+                  setFailCount(0);
+                }}
+                className="w-full bg-green-500 hover:bg-green-600 text-white text-xl font-bold py-4 rounded-xl shadow-md transition"
+              >
+                つぎへ
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      if (step === 'SPEAK_MY_DAY') {
+        const englishSentence = `My special day is ${MONTHS[selectedMonth - 1]} ${getOrdinal(selectedDate)}.`;
+        
+        return (
+          <div className="min-h-screen bg-pink-50 p-4 md:p-8 flex items-center justify-center">
+            <div className="max-w-lg w-full bg-white rounded-3xl shadow-xl p-8 border-4 border-pink-200 text-center">
+              {renderHeader("えいごで いってみよう！")}
+              
+              <div className="bg-pink-100 p-6 rounded-2xl mb-6">
+                <p className="text-3xl font-bold text-pink-700 mb-2">{englishSentence}</p>
+                <button onClick={() => speak(englishSentence)} className="flex items-center justify-center mx-auto text-pink-600 hover:text-pink-800 bg-white px-4 py-2 rounded-full shadow-sm">
+                  <span className="mr-2 text-xl">🔊</span> おてほんをきく
+                </button>
+              </div>
+
+              <div className="mb-8">
+                <button 
+                  onClick={() => startListening('MY_DAY')}
+                  disabled={isListening}
+                  className={`p-6 rounded-full shadow-lg transition transform hover:scale-105 active:scale-95 ${isListening ? 'bg-red-500 animate-pulse' : 'bg-blue-500 hover:bg-blue-600'} text-white mx-auto flex items-center justify-center`}
+                >
+                  <span className="text-4xl">🎤</span>
+                </button>
+                <p className="mt-4 text-gray-600 font-bold">{isListening ? "はなしてください..." : "マイクをおして はなす"}</p>
+                
+                {recognitionText && (
+                   <div className="mt-4 p-3 bg-gray-100 rounded-lg text-lg text-gray-700 italic">
+                     ききとったことば: "{recognitionText}"
+                   </div>
+                )}
+                {feedbackMsg && (
+                   <div className={`mt-4 text-xl font-bold ${feedbackMsg.includes('Excellent') ? 'text-green-500' : 'text-orange-500'}`}>
+                     {feedbackMsg}
+                   </div>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-4">
+                <button 
+                  onClick={() => setStep('GREETING')}
+                  className="text-gray-500 underline text-sm py-2"
+                >
+                  日付を入力しなおす (訂正する)
+                </button>
+
+                {failCount >= 5 && (
+                  <button 
+                    onClick={() => proceedToNext('MY_DAY')}
+                    className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-6 rounded-xl flex items-center justify-center mx-auto transition"
+                  >
+                    <span className="mr-2">⏭️</span> むずかしいので スキップ
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      if (step === 'ASK_WHY') {
+        return (
+          <div className="min-h-screen bg-purple-50 p-4 md:p-8 flex items-center justify-center">
+            <div className="max-w-lg w-full bg-white rounded-3xl shadow-xl p-8 border-4 border-purple-200 text-center">
+              {renderHeader("コンピューターからの しつもん")}
+              
+              <div className="mb-6">
+                <button onClick={() => speak("Why?")} className="bg-purple-100 p-4 rounded-full text-purple-600 hover:bg-purple-200 transition mx-auto flex items-center justify-center mb-4">
+                  <span className="text-4xl">🔊</span>
+                </button>
+                <p className="text-3xl font-bold text-gray-700">"Why?"</p>
+                <p className="text-gray-500 mt-2">（どうして その日が とくべつなの？）</p>
+              </div>
+
+              <div className="bg-gray-50 p-6 rounded-2xl mb-6 text-left">
+                <p className="text-lg font-bold mb-2">その日は…</p>
+                <div className="flex items-center mb-2">
+                  <input 
+                    type="text" 
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="例：祝日、行事、記念日、思い出に残っている日など"
+                    className="flex-1 p-3 border-2 border-gray-300 rounded-xl font-bold w-full"
+                  />
+                  <span className="ml-2 font-bold">です。</span>
+                </div>
+                
+                <div className="mt-4 bg-yellow-50 p-4 rounded-xl border border-yellow-200 text-sm">
+                  <p className="text-gray-700 mb-2">💡 思いつかない人は、「ソウゾウ」に相談してもいいよ！下の文字を長押しや選択でコピーしてね。</p>
+                  <div className="bg-white border border-gray-300 text-gray-800 px-3 py-4 rounded text-center font-bold text-lg select-all cursor-text">
+                    わたしにとっての特別な日はいつ？
+                  </div>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => {
+                  setStep('ASK_COM_DAY');
+                  setFailCount(0);
+                }}
+                disabled={!reason.trim()}
+                className={`w-full text-white text-xl font-bold py-4 rounded-xl shadow-md transition ${reason.trim() ? 'bg-purple-500 hover:bg-purple-600' : 'bg-gray-300 cursor-not-allowed'}`}
+              >
+                つぎへ
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      if (step === 'ASK_COM_DAY') {
+        return (
+          <div className="min-h-screen bg-orange-50 p-4 md:p-8 flex items-center justify-center">
+            <div className="max-w-lg w-full bg-white rounded-3xl shadow-xl p-8 border-4 border-orange-200 text-center">
+              {renderHeader("コンピューターに きいてみよう！")}
+              
+              <div className="bg-orange-100 p-6 rounded-2xl mb-6">
+                <p className="text-2xl font-bold text-orange-700 mb-2">When is your special day?</p>
+                <button onClick={() => speak("When is your special day?")} className="flex items-center justify-center mx-auto text-orange-600 hover:text-orange-800 bg-white px-4 py-2 rounded-full shadow-sm">
+                  <span className="mr-2 text-xl">🔊</span> おてほんをきく
+                </button>
+              </div>
+
+              <div className="mb-8">
+                <button 
+                  onClick={() => startListening('ASK_DAY')}
+                  disabled={isListening}
+                  className={`p-6 rounded-full shadow-lg transition transform hover:scale-105 active:scale-95 ${isListening ? 'bg-red-500 animate-pulse' : 'bg-blue-500 hover:bg-blue-600'} text-white mx-auto flex items-center justify-center`}
+                >
+                  <span className="text-4xl">🎤</span>
+                </button>
+                <p className="mt-4 text-gray-600 font-bold">{isListening ? "はなしてください..." : "マイクをおして はなす"}</p>
+                
+                {recognitionText && (
+                   <div className="mt-4 p-3 bg-gray-100 rounded-lg text-lg text-gray-700 italic">
+                     ききとったことば: "{recognitionText}"
+                   </div>
+                )}
+                {feedbackMsg && (
+                   <div className={`mt-4 text-xl font-bold ${feedbackMsg.includes('Excellent') ? 'text-green-500' : 'text-orange-500'}`}>
+                     {feedbackMsg}
+                   </div>
+                )}
+              </div>
+
+              {failCount >= 5 && (
+                <button 
+                  onClick={() => proceedToNext('ASK_DAY')}
+                  className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-6 rounded-xl flex items-center justify-center mx-auto transition"
+                >
+                  <span className="mr-2">⏭️</span> むずかしいので スキップ
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      }
+
+      if (step === 'COM_ANSWER_DAY') {
+        const comAnswer = "My special day is December twenty-fifth.";
+
+        return (
+          <div className="min-h-screen bg-teal-50 p-4 md:p-8 flex items-center justify-center">
+            <div className="max-w-lg w-full bg-white rounded-3xl shadow-xl p-8 border-4 border-teal-200 text-center">
+              {renderHeader("コンピューターの こたえ")}
+              
+              <div className="mb-8">
+                <div className="bg-gray-200 w-24 h-24 rounded-full mx-auto mb-4 flex items-center justify-center text-4xl">
+                  💻
+                </div>
+                <button onClick={() => speak(comAnswer)} className="bg-teal-100 p-3 rounded-full text-teal-600 hover:bg-teal-200 transition mx-auto flex items-center justify-center mb-4">
+                  <span className="text-4xl">🔊</span>
+                </button>
+                <p className="text-2xl font-bold text-gray-700">"{comAnswer}"</p>
+                <p className="text-gray-500 mt-2">（わたしの とくべつな日は 12月25日です。）</p>
+              </div>
+
+              <button 
+                onClick={() => {
+                  setStep('ASK_COM_WHY');
+                  setFailCount(0);
+                }}
+                className="w-full bg-teal-500 hover:bg-teal-600 text-white text-xl font-bold py-4 rounded-xl shadow-md transition"
+              >
+                つぎへ
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      if (step === 'ASK_COM_WHY') {
+        return (
+          <div className="min-h-screen bg-orange-50 p-4 md:p-8 flex items-center justify-center">
+            <div className="max-w-lg w-full bg-white rounded-3xl shadow-xl p-8 border-4 border-orange-200 text-center">
+              {renderHeader("コンピューターに きいてみよう！")}
+              
+              <div className="bg-orange-100 p-6 rounded-2xl mb-6">
+                <p className="text-3xl font-bold text-orange-700 mb-2">Why?</p>
+                <button onClick={() => speak("Why?")} className="flex items-center justify-center mx-auto text-orange-600 hover:text-orange-800 bg-white px-4 py-2 rounded-full shadow-sm">
+                  <span className="mr-2 text-xl">🔊</span> おてほんをきく
+                </button>
+              </div>
+
+              <div className="mb-8">
+                <button 
+                  onClick={() => startListening('ASK_WHY')}
+                  disabled={isListening}
+                  className={`p-6 rounded-full shadow-lg transition transform hover:scale-105 active:scale-95 ${isListening ? 'bg-red-500 animate-pulse' : 'bg-blue-500 hover:bg-blue-600'} text-white mx-auto flex items-center justify-center`}
+                >
+                  <span className="text-4xl">🎤</span>
+                </button>
+                <p className="mt-4 text-gray-600 font-bold">{isListening ? "はなしてください..." : "マイクをおして はなす"}</p>
+                
+                {recognitionText && (
+                   <div className="mt-4 p-3 bg-gray-100 rounded-lg text-lg text-gray-700 italic">
+                     ききとったことば: "{recognitionText}"
+                   </div>
+                )}
+                {feedbackMsg && (
+                   <div className={`mt-4 text-xl font-bold ${feedbackMsg.includes('Excellent') ? 'text-green-500' : 'text-orange-500'}`}>
+                     {feedbackMsg}
+                   </div>
+                )}
+              </div>
+
+              {failCount >= 5 && (
+                <button 
+                  onClick={() => proceedToNext('ASK_WHY')}
+                  className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-6 rounded-xl flex items-center justify-center mx-auto transition"
+                >
+                  <span className="mr-2">⏭️</span> むずかしいので スキップ
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      }
+
+      if (step === 'COM_ANSWER_WHY') {
+        const comAnswerWhy = "Because it's Christmas! I love eating cake with my family.";
+
+        return (
+          <div className="min-h-screen bg-teal-50 p-4 md:p-8 flex items-center justify-center">
+            <div className="max-w-lg w-full bg-white rounded-3xl shadow-xl p-8 border-4 border-teal-200 text-center">
+              {renderHeader("コンピューターの こたえ")}
+              
+              <div className="mb-8">
+                 <div className="bg-gray-200 w-24 h-24 rounded-full mx-auto mb-4 flex items-center justify-center text-4xl">
+                  💻
+                </div>
+                <button onClick={() => speak(comAnswerWhy)} className="bg-teal-100 p-3 rounded-full text-teal-600 hover:bg-teal-200 transition mx-auto flex items-center justify-center mb-4">
+                  <span className="text-4xl">🔊</span>
+                </button>
+                <p className="text-xl font-bold text-gray-700">"{comAnswerWhy}"</p>
+                <p className="text-gray-500 mt-2 text-sm">（クリスマスだからです！かぞくとケーキをたべるのが だいすきです。）</p>
+              </div>
+
+              <button 
+                onClick={() => {
+                  if (playCount === 0) {
+                    setStep('NOTEBOOK');
+                  } else {
+                    setStep('GACHA');
+                  }
+                }}
+                className="w-full bg-blue-500 hover:bg-blue-600 text-white text-xl font-bold py-4 rounded-xl shadow-md transition"
+              >
+                {playCount === 0 ? 'つぎへ' : 'ガチャへすすむ！'}
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      if (step === 'NOTEBOOK') {
+        return (
+          <div className="min-h-screen bg-yellow-50 p-4 md:p-8 flex items-center justify-center">
+            <div className="max-w-2xl w-full bg-white rounded-3xl shadow-xl p-8 border-4 border-yellow-200">
+              <div className="flex items-center justify-center text-yellow-600 mb-6">
+                <span className="mr-4 text-4xl">📖</span>
+                <h2 className="text-3xl font-bold">ノートに かきましょう</h2>
+              </div>
+              
+              <div className="bg-white border-2 border-gray-300 p-8 rounded-lg shadow-inner mb-8 bg-[url('https://www.transparenttextures.com/patterns/lined-paper-2.png')]">
+                <p className="text-gray-600 mb-4 font-bold text-lg">あとで はっぴょうするので、じぶんの いったことを ノートに うつしてね。</p>
+                <div className="text-2xl font-mono text-gray-800 leading-loose border-b-2 border-dashed border-gray-400 mb-4 pb-2">
+                  My special day is {MONTHS[selectedMonth - 1]} {getOrdinal(selectedDate)}.
+                </div>
+                <div className="text-xl text-gray-800 leading-loose">
+                  理由：その日は {reason} です。
+                </div>
+              </div>
+
+              <div className="bg-red-50 p-6 rounded-xl border border-red-200 text-center mb-8">
+                <p className="text-red-700 font-bold text-lg mb-2">ノートが かけたら、先生を よんで スタンプを もらいましょう！</p>
+                <p className="text-gray-600">スタンプを もらったら、下のボタンを おしてね。</p>
+              </div>
+
+              <button 
+                onClick={() => setStep('GACHA')}
+                className="w-full bg-yellow-500 hover:bg-yellow-600 text-white text-2xl font-bold py-4 rounded-xl shadow-lg transform transition hover:scale-105 active:scale-95 flex items-center justify-center"
+              >
+                <span className="mr-2 text-3xl">💮</span> スタンプをもらった！
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      if (step === 'GACHA') {
+        return (
+          <div className="min-h-screen bg-indigo-900 p-4 md:p-8 flex items-center justify-center overflow-hidden relative">
+            <div className="absolute inset-0 opacity-50 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-indigo-700 via-indigo-900 to-black"></div>
+
+            <div className="max-w-lg w-full bg-white/10 backdrop-blur-md rounded-3xl shadow-2xl p-8 text-center relative z-10 border border-white/20">
+              <h2 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-500 mb-8 drop-shadow-lg">
+                おたのしみ ガチャ！
+              </h2>
+
+              {!currentGachaMonster ? (
+                <div className="mb-12">
+                  {isRolling ? (
+                    <div className="flex flex-col items-center justify-center">
+                      <p className="text-yellow-300 font-bold text-2xl mb-8 animate-pulse">なにがでるかな...？</p>
+                      <div className="w-48 h-48 mx-auto bg-white rounded-full flex items-center justify-center shadow-[0_0_80px_rgba(255,255,255,0.8)] mb-8 border-4 border-yellow-300 transform transition-all duration-100 scale-110">
+                        <span className="text-8xl filter drop-shadow-md">{rollEmoji}</span>
+                      </div>
+                      <div className="flex justify-center gap-6 text-4xl">
+                         <span className="animate-spin">✨</span>
+                         <span className="animate-bounce">🌟</span>
+                         <span className="animate-spin">✨</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="w-48 h-48 mx-auto bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center shadow-[0_0_50px_rgba(236,72,153,0.5)] animate-bounce mb-8">
+                        <span className="text-7xl">🎁</span>
+                      </div>
+                      <button 
+                        onClick={rollGacha}
+                        className="bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white text-3xl font-black py-5 px-12 rounded-full shadow-2xl transform transition hover:scale-110 active:scale-95 border-4 border-yellow-200"
+                      >
+                        ガチャを まわす！
+                      </button>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="mb-8 animate-fade-in-up">
+                  <p className="text-yellow-300 font-bold text-xl mb-4">ゲットした モンスターは…</p>
+                  <div className={`${currentGachaMonster.color} w-64 h-64 mx-auto rounded-full flex flex-col items-center justify-center shadow-[0_0_60px_rgba(255,255,255,0.4)] mb-6 border-8 border-white`}>
+                    <span className="text-8xl mb-2 filter drop-shadow-md">{currentGachaMonster.emoji}</span>
+                  </div>
+                  <h3 className="text-4xl font-extrabold text-white mb-8 drop-shadow-md">{currentGachaMonster.name}</h3>
+                  
+                  <button 
+                    onClick={() => {
+                      setCurrentGachaMonster(null);
+                      setStep('HOME');
+                    }}
+                    className="bg-blue-500 hover:bg-blue-600 text-white text-xl font-bold py-4 px-8 rounded-full shadow-lg flex items-center justify-center mx-auto transition"
+                  >
+                    <span className="mr-2">🏠</span> さいしょに もどる
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      }
+
+      return null;
+    }
+
+    // Reactアプリの描画
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
